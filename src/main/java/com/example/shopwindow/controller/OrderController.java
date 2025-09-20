@@ -5,36 +5,27 @@ import com.example.shopwindow.service.OrderService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-
-import java.util.List;
+import org.springframework.web.bind.annotation.*;
+import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
 
 @Controller
 @RequiredArgsConstructor
 @RequestMapping("/orders")
 public class OrderController {
     private final OrderService orderService;
-    @GetMapping("/")
-    public String getOrders(Model model) {
-        List<Order> orders = orderService.findAll();
-        model.addAttribute("orders", orders);
-        return "orders";
-    }
 
     @GetMapping("/{id}")
-    public String getOrder(
-            @PathVariable Long id,
-            @RequestParam(defaultValue = "false") boolean newOrder,
-            Model model
-    ) {
-        Order order = orderService.findById(id).orElseThrow();
-        model.addAttribute("order", order);
-        model.addAttribute("id", order.getId());
-        model.addAttribute("items", order.getItems());
-        model.addAttribute("newOrder", newOrder);
-        return "order";
+    public Mono<String> getOrder(@PathVariable Long id,
+                                 @RequestParam(defaultValue = "false") boolean newOrder,
+                                 Model model) {
+        return orderService.findById(id)
+                .map(order -> {
+                    model.addAttribute("order", order);
+                    model.addAttribute("id", order.getId());
+                    model.addAttribute("items", order.getItems());
+                    model.addAttribute("newOrder", newOrder);
+                    return "order";
+                });
     }
 }

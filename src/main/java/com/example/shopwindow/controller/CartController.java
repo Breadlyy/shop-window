@@ -7,6 +7,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
+import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
 
 import java.math.BigDecimal;
 import java.util.ArrayList;
@@ -19,34 +21,39 @@ import java.util.Map;
 public class CartController {
     private final CartService cartService;
     private final ItemService itemService;
+
     @GetMapping("/")
-    public String getCart(Model model) {
+    public Mono<String> getCart(Model model) {
         Map<Long, Integer> cart = cartService.getItems();
-        List<Item> items = new ArrayList<>();
-        BigDecimal total = new BigDecimal(0);
 
-        for (var entry : cart.entrySet()) {
-            Item item = itemService.findById(entry.getKey()).orElseThrow();
-            int qty = entry.getValue();
-            item.setCount(qty);
-            total = total.add(item.getPrice().multiply(new BigDecimal(qty)));
-            items.add(item);
-        }
+        return Flux.fromIterable(cart.entrySet())
+                .flatMap(entry -> itemService.findById(entry.getKey())
+                        .map(item -> {
+                            int qty = entry.getValue();
+                            item.setCount(qty);
+                            return new Object[]{item, item.getPrice().multiply(BigDecimal.valueOf(qty))};
+                        })
+                )
+                .collectList()
+                .map(list -> {
+                    List<Item> items = new ArrayList<>();
+                    BigDecimal total = BigDecimal.ZERO;
 
-        model.addAttribute("items", items);
-        model.addAttribute("total", total);
-        model.addAttribute("empty", items.isEmpty());
-        return "cart";
+                    for (Object[] obj : list) {
+                        items.add((Item) obj[0]);
+                        total = total.add((BigDecimal) obj[1]);
+                    }
+
+                    model.addAttribute("items", items);
+                    model.addAttribute("total", total);
+                    model.addAttribute("empty", items.isEmpty());
+                    return "cart";
+                });
     }
 
-
-    // e) POST "/cart/items/{id}"
     @PostMapping("/{id}")
     public String updateCartFromCart(@PathVariable Long id, @RequestParam String action) {
-        handleCartAction(id, action);
-        return "redirect:/cart/items";
-    }
-    private void handleCartAction(Long id, String action) {
         cartService.updateItem(id, action);
+        return "redirect:/cart/items";
     }
 }

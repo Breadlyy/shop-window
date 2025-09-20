@@ -7,10 +7,8 @@ import com.example.shopwindow.service.OrderService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.*;
+import reactor.core.publisher.Mono;
 
 @Controller
 @RequiredArgsConstructor
@@ -21,26 +19,25 @@ public class ItemController {
 
     @PostMapping("/items/{id}")
     public String updateCartFromItem(@PathVariable Long id, @RequestParam String action) {
-        handleCartAction(id, action);
+        cartService.updateItem(id, action);
         return "redirect:/items/" + id;
     }
 
     @GetMapping("/items/{id}")
-    public String getItem(@PathVariable Long id, Model model) {
-        Item item = itemService.findById(id).orElseThrow();
-        model.addAttribute("item", item);
-        return "item";
+    public Mono<String> getItem(@PathVariable Long id, Model model) {
+        return itemService.findById(id)
+                .map(item -> {
+                    model.addAttribute("item", item);
+                    return "item";
+                });
     }
 
     @PostMapping("/buy")
-    public String buyItems() {
-        Long orderId = orderService.createOrder(cartService.getItems()).getId();
-        itemService.reduceCount(cartService.getItems());
-        cartService.clear();
-        return "redirect:/orders/" + orderId + "?newOrder=true";
-    }
-
-    private void handleCartAction(Long id, String action) {
-        cartService.updateItem(id, action);
+    public Mono<String> buyItems() {
+        return orderService.createOrder(cartService.getItems())
+                .flatMap(order -> itemService.reduceCount(cartService.getItems())
+                        .then(Mono.fromRunnable(cartService::clear))
+                        .thenReturn("redirect:/orders/" + order.getId() + "?newOrder=true")
+                );
     }
 }
