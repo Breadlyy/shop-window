@@ -1,0 +1,11 @@
+spring:
+  application:
+    name: shop-window
+
+  r2dbc:
+    url: r2dbc:postgresql://localhost:5432/shop-window
+    username: postgres
+    password: 123
+
+server:
+  port: 8080

@@ -1,1 +1,1 @@
-# shop-window
+Запустить ShopWindowApplication
